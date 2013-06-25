@@ -12,7 +12,7 @@ USER="tunnel"
 . /lib/lsb/init-functions
 
 load_sport(){
- local CONF LARGS PROXY_COMMAND KEY SPORT DEST SSH_DEST
+ local CONF LARGS PROXY_COMMAND KEY SPORT DEST SSH_DEST BIND TYPE
  CONF=$1
  if [ -f "$CONF_DIR/$CONF.conf" ]; then
   . $CONF_DIR/$CONF.conf
@@ -25,7 +25,7 @@ load_sport(){
 }
 
 load_conf(){
- local CONF LARGS PROXY_COMMAND KEY SPORT DEST SSH_DEST
+ local CONF LARGS PROXY_COMMAND KEY SPORT DEST SSH_DEST BIND TYPE
  CONF=$1
  LARGS="$ARGS"
  if [ -f "$CONF_DIR/$CONF.conf" ]; then
@@ -36,8 +36,12 @@ load_conf(){
   if [ ! -z "$KEY" ]; then
    LARGS="$LARGS -i $KEY"
   fi
-  if [ ! -z $SPORT ] && [ ! -z $DEST ]; then
-   LARGS="$LARGS -L$SPORT:$DEST"
+  if [ ! -z $SPORT ] && [ ! -z $DEST ] && [ ! -z $TYPE ]; then
+   if [ ! -z $BIND ]; then
+    LARGS="$LARGS -$TYPE$BIND:$SPORT:$DEST"
+   else
+    LARGS="$LARGS -$TYPE$SPORT:$DEST"
+   fi
   fi
   if [ ! -z "$SSH_DEST" ]; then
    LARGS="$LARGS $SSH_DEST";
