@@ -1,0 +1,152 @@
+#!/bin/bash
+# lsof -t -i @localhost:6666 -sTCP:listen
+
+DAEMON="/usr/bin/ssh"
+NAME="ssh_tunnel"
+DESC="ssh tunnel"
+PID_DIR="/var/run/$NAME"
+CONF_DIR="/etc/$NAME"
+ARGS="-o ExitOnForwardFailure=yes -o NumberOfPasswordPrompts=0 -f -N"
+USER="tunnel"
+
+. /lib/lsb/init-functions
+
+load_sport(){
+ local CONF LARGS PROXY_COMMAND KEY SPORT DEST SSH_DEST
+ CONF=$1
+ if [ -f "$CONF_DIR/$CONF.conf" ]; then
+  . $CONF_DIR/$CONF.conf
+  if [ ! -z $SPORT ]; then
+   echo -n $SPORT
+   return 0
+  fi
+ fi
+ return 1
+}
+
+load_conf(){
+ local CONF LARGS PROXY_COMMAND KEY SPORT DEST SSH_DEST
+ CONF=$1
+ LARGS="$ARGS"
+ if [ -f "$CONF_DIR/$CONF.conf" ]; then
+  . $CONF_DIR/$CONF.conf
+  if [ ! -z "$PROXY_COMMAND" ]; then
+    LARGS="$LARGS -o ProxyCommand=\"$PROXY_COMMAND\""
+  fi
+  if [ ! -z "$KEY" ]; then
+   LARGS="$LARGS -i $KEY"
+  fi
+  if [ ! -z $SPORT ] && [ ! -z $DEST ]; then
+   LARGS="$LARGS -L$SPORT:$DEST"
+  fi
+  if [ ! -z "$SSH_DEST" ]; then
+   LARGS="$LARGS $SSH_DEST";
+  else
+    return 1
+  fi
+  echo -n "$LARGS"
+  return 0
+ else
+  return 1
+ fi
+}
+
+tunnel_stoped(){
+  CONF=$1
+  if [ -f $PID_DIR/$CONF.pid ]; then
+    pid=`cat $PID_DIR/$CONF.pid`
+    if [ `ps -p $pid | wc -l` -eq 2 ]; then
+      return 1
+    fi
+  fi
+  return 0
+}
+
+tunnel_start(){
+ CONF=$1
+ if $(tunnel_stoped $CONF) && LARGS=$(load_conf $CONF); then
+  log_daemon_msg "Starting $DESC $CONF"
+  /bin/su -l $USER -c "$DAEMON $LARGS" || return 1
+  mkdir -p $PID_DIR
+  `lsof -t -i @localhost:$(load_sport $CONF) -sTCP:listen > $PID_DIR/$CONF.pid`
+ else
+  log_failure_msg "Tunnel $CONF already running"
+ fi
+}
+
+tunnel_stop(){
+ CONF=$1
+ if $(tunnel_stoped $CONF); then
+  log_warning_msg "$CONF not running"
+ else
+  pid=`cat $PID_DIR/$CONF.pid`
+  echo -n " * Stopping $DESC $CONF"
+  for i in `seq 30`; do
+    echo -n "."
+    if $(tunnel_stoped $CONF); then
+      echo " OK"
+      rm $PID_DIR/$CONF.pid
+      return 0
+    else
+      kill $pid
+    fi
+    sleep 1
+  done
+  echo " FAILED"
+  return 1
+ fi
+}
+
+start(){
+    if test -z "$2" ; then
+      for CONF_FILE in `cd $CONF_DIR; ls *.conf 2> /dev/null`; do
+        CONF=${CONF_FILE%%.conf}
+        tunnel_start $CONF
+      done
+    else
+      while shift ; do
+        [ -z "$1" ] && break
+        CONF=$1
+        if test -e $CONF_DIR/$CONF.conf ; then
+            tunnel_start $CONF
+        else
+          log_failure_msg "missing $CONF_DIR/$CONF.conf"
+        fi
+      done
+    fi
+}
+
+stop(){
+    if test -z "$2" ; then
+      for CONF_FILE in `cd $CONF_DIR; ls *.conf 2> /dev/null`; do
+        CONF=${CONF_FILE%%.conf}
+        tunnel_stop $CONF
+      done
+    else
+      while shift ; do
+        [ -z "$1" ] && break
+        CONF=$1
+        if test -e $CONF_DIR/$CONF.conf ; then
+          tunnel_stop $CONF
+        else
+          log_failure_msg "missing $CONF_DIR/$CONF.conf"
+        fi
+      done
+    fi
+}
+case $1 in
+  start) start $@
+  ;;
+  stop) stop $@
+  ;;
+  restart)
+    stop $@
+    start $@
+  ;;
+  *)
+   echo "Usage: $0 {start|stop|restart} [tunnel_config]" >&2
+   exit 1
+  ;;
+
+esac
+
