@@ -69,10 +69,15 @@ tunnel_stoped(){
 tunnel_start(){
  CONF=$1
  if $(tunnel_stoped $CONF) && LARGS=$(load_conf $CONF); then
+  LPORT=$(load_sport $CONF)
+  if [ ! -z "`lsof -t -i @localhost:$LPORT -sTCP:listen`" ]; then
+    log_failure_msg "Tunnel listen port $LPORT already binded for $CONF."
+    return 1
+  fi
   log_daemon_msg "Starting $DESC $CONF"
   /bin/su -l $USER -c "$DAEMON $LARGS" || return 1
   mkdir -p $PID_DIR
-  `lsof -t -i @localhost:$(load_sport $CONF) -sTCP:listen > $PID_DIR/$CONF.pid`
+  `lsof -t -i @localhost:$LPORT -sTCP:listen > $PID_DIR/$CONF.pid`
  else
   log_failure_msg "Tunnel $CONF already running"
  fi
