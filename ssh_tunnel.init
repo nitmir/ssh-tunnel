@@ -138,6 +138,21 @@ stop(){
       done
     fi
 }
+status(){
+    if test -z "$2" ; then
+      for CONF_FILE in `cd $CONF_DIR; ls *.conf 2> /dev/null`; do
+        CONF=${CONF_FILE%%.conf}
+        status_of_proc -p "$PID_DIR/$CONF.pid" "$DAEMON" "$DESC $CONF"
+      done
+    else
+      while shift ; do
+        [ -z "$1" ] && break
+        CONF=$1
+        status_of_proc -p "$PID_DIR/$CONF.pid" "$DAEMON" "$DESC $CONF"
+      done
+    fi
+}
+
 case $1 in
   start) start $@
   ;;
@@ -147,8 +162,11 @@ case $1 in
     stop $@
     start $@
   ;;
+  status)
+    status $@
+  ;;
   *)
-   echo "Usage: $0 {start|stop|restart} [tunnel_config]" >&2
+   echo "Usage: $0 {start|stop|restart|status} [`cd $CONF_DIR; ls -m *.conf 2> /dev/null | sed 's/\.conf//g;s/, /|/g'`]" >&2
    exit 1
   ;;
 
