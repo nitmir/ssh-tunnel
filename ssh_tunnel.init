@@ -1,5 +1,12 @@
 #!/bin/bash
-# lsof -t -i @localhost:6666 -sTCP:listen
+### BEGIN INIT INFO
+# Provides:          ssh_tunnel
+# Required-Start:    $remote_fs $network $syslog $named
+# Required-Stop:     $remote_fs $network $syslog $named
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: ssh tunnel
+### END INIT INFO
 
 DAEMON="/usr/bin/ssh"
 NAME="ssh_tunnel"
@@ -177,3 +184,4 @@ case $1 in
 
 esac
 
+exit 0
