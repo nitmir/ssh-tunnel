@@ -26,8 +26,15 @@ CONF_DIR="/etc/$NAME"
 ARGS="-o ExitOnForwardFailure=yes -o NumberOfPasswordPrompts=0 -N"
 USER="tunnel"
 
+# Exit if the package is not installed
+[ -x "$DAEMON" ] || exit 0
+
+# Read configuration variable file if it is present
+[ -r /etc/default/$NAME ] && . /etc/default/$NAME
+
 . /lib/lsb/init-functions
 
+# building ssh arguments function from $CONF_DIR
 load_conf(){
  local CONF LARGS PROXY_COMMAND KEY SPORT DEST SSH_DEST BIND TYPE
  CONF=$1
@@ -59,17 +66,18 @@ load_conf(){
  fi
 }
 
+# Test if a tunnel is not running
 tunnel_stoped(){
   CONF=$1
-  if [ -f $PID_DIR/$CONF.pid ]; then
-    pid=`cat $PID_DIR/$CONF.pid`
-    if [ `ps -p $pid | wc -l` -eq 2 ]; then
+  if [ -f "$PID_DIR/$CONF.pid" ]; then
+    if status_of_proc -p "$PID_DIR/$CONF.pid" > /dev/null; then
       return 1
     fi
   fi
   return 0
 }
 
+# Start a tunnel
 tunnel_start(){
  CONF=$1
  if $(tunnel_stoped $CONF) && LARGS=$(load_conf $CONF); then
@@ -80,6 +88,7 @@ tunnel_start(){
  fi
 }
 
+# Stop a tunnel
 tunnel_stop(){
  CONF=$1
  if $(tunnel_stoped $CONF); then
