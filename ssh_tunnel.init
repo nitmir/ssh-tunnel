@@ -13,23 +13,10 @@ NAME="ssh_tunnel"
 DESC="ssh tunnel"
 PID_DIR="/var/run/$NAME"
 CONF_DIR="/etc/$NAME"
-ARGS="-o ExitOnForwardFailure=yes -o NumberOfPasswordPrompts=0 -f -N"
+ARGS="-o ExitOnForwardFailure=yes -o NumberOfPasswordPrompts=0 -N"
 USER="tunnel"
 
 . /lib/lsb/init-functions
-
-load_sport(){
- local CONF LARGS PROXY_COMMAND KEY SPORT DEST SSH_DEST BIND TYPE
- CONF=$1
- if [ -f "$CONF_DIR/$CONF.conf" ]; then
-  . $CONF_DIR/$CONF.conf
-  if [ ! -z $SPORT ]; then
-   echo -n $SPORT
-   return 0
-  fi
- fi
- return 1
-}
 
 load_conf(){
  local CONF LARGS PROXY_COMMAND KEY SPORT DEST SSH_DEST BIND TYPE
@@ -76,15 +63,8 @@ tunnel_stoped(){
 tunnel_start(){
  CONF=$1
  if $(tunnel_stoped $CONF) && LARGS=$(load_conf $CONF); then
-  LPORT=$(load_sport $CONF)
-  if [ ! -z "`lsof -t -i @localhost:$LPORT -sTCP:listen`" ]; then
-    log_failure_msg "Tunnel listen port $LPORT already binded for $CONF."
-    return 1
-  fi
   log_daemon_msg "Starting $DESC $CONF"
-  /bin/su -l $USER -c "$DAEMON $LARGS" || return 1
-  mkdir -p $PID_DIR
-  `lsof -t -i @localhost:$LPORT -sTCP:listen > $PID_DIR/$CONF.pid`
+  eval "/sbin/start-stop-daemon --start --background --make-pidfile --pidfile \"$PID_DIR/$CONF.pid\" --user $USER --chuid $USER --exec $DAEMON -- $LARGS"
  else
   log_failure_msg "Tunnel $CONF already running"
  fi
@@ -95,21 +75,15 @@ tunnel_stop(){
  if $(tunnel_stoped $CONF); then
   log_warning_msg "$CONF not running"
  else
-  pid=`cat $PID_DIR/$CONF.pid`
-  echo -n " * Stopping $DESC $CONF"
-  for i in `seq 30`; do
-    echo -n "."
-    if $(tunnel_stoped $CONF); then
-      echo " OK"
-      rm $PID_DIR/$CONF.pid
-      return 0
-    else
-      kill $pid
-    fi
-    sleep 1
-  done
-  echo " FAILED"
-  return 1
+   start-stop-daemon --stop --user $USER --pidfile "$PID_DIR/$CONF.pid"
+   RET=$?
+   if [[ $RET -eq 0 ]]; then
+     log_success_msg "The process stopped successfully"
+     return 0
+   else
+     log_failure_msg "The process failed to stop"
+     return 1
+   fi
  fi
 }
 
