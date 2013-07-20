@@ -94,7 +94,7 @@ tunnel_stop(){
  if $(tunnel_stoped $CONF); then
   log_warning_msg "$CONF not running"
  else
-   start-stop-daemon --stop --user $USER --pidfile "$PID_DIR/$CONF.pid"
+   start-stop-daemon --stop --retry 30 --user $USER --pidfile "$PID_DIR/$CONF.pid"
    RET=$?
    if [[ $RET -eq 0 ]]; then
      log_success_msg "The process stopped successfully"
