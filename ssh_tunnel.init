@@ -32,6 +32,7 @@ USER="tunnel"
 # Read configuration variable file if it is present
 [ -r /etc/default/$NAME ] && . /etc/default/$NAME
 
+[ ! -d "$PID_DIR" ] && mkdir -p "$PID_DIR"
 . /lib/lsb/init-functions
 
 # building ssh arguments function from $CONF_DIR
